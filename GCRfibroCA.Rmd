@@ -37,7 +37,7 @@ big_df = rbind(Oxygen, Si, Ti, Fe600, Fe450, Fe300)
 big_df$Z = rep(param$Z, times = c(9, 11, 9, 11, 8, 10))
 big_df$Z.beta = rep(param$Z.beta, times = c(9, 11, 9, 11, 8, 10))
 big_df$L = rep(param$L, times = c(9, 11, 9, 11, 8, 10))
-big_df$error = c(0.24, 0.63, 0.77, 0.75, 0.52, 0.82, 0.78, 1.31, 1.59, 0.12, 0.05, 0.07, 0.56, 0.18, 0.60, 1.23, 1.60, 1.55, 4.27, 7.21, 0, 0.70, 0.66, 0.59, 0.80, 0.78, 0.48, 1.15, 2.39, 0.16, 0.38, 0.24, 0.21, 0.02, 0.37, 0.54, 0.17, 0.55, 1.75, 2.59, 0, 0.43, 0.34, 0.40, 0.50, 0.64, 0.73, 1.09, 0.29, 0.55, 0.60, 0.55, 0.49, 0.60, 0.54, 1.03, 1.22, 3.62)
+big_df$error = c(0.24, 0.63, 0.77, 0.75, 0.52, 0.82, 0.78, 1.31, 1.59, 0.12, 0.05, 0.07, 0.56, 0.18, 0.60, 1.23, 1.60, 1.55, 4.27, 7.21, 0, 0.70, 0.66, 0.59, 0.80, 0.78, 0.48, 1.15, 2.39, 0.16, 0.38, 0.24, 0.21, 0.4, 0.37, 0.54, 0.17, 0.55, 1.75, 2.59, 0, 0.43, 0.34, 0.40, 0.50, 0.64, 0.73, 1.09, 0.29, 0.55, 0.60, 0.55, 0.49, 0.60, 0.54, 1.03, 1.22, 3.62)
 big_df$ion = rep(param$ion, times = c(9, 11, 9, 11, 8, 10))
 
 #will modify the data frame to get rid of the zero dose points irrelevant to our main parameter estimation
@@ -84,10 +84,12 @@ coef(IDER_model)
 vcov(IDER_model)
 summary(IDER_model, cor = TRUE)
 ```
+1 - (rse / sd)^2
 
 #Information criteria (AIC and BIC) - table 5 
 ```{r}
 #L_function gives the residuals squared
+eta0 = as.vector(coef(IDER_model)[1]); eta1 = as.vector(coef(IDER_model)[2]); sig0 = as.vector(coef(IDER_model)[3]); kap = as.vector(coef(IDER_model)[4])
 L_function = function(func, eta0, eta1, sig0, kap) {
   a = vector(length = 0)
   for (i in 1:length(modified_df[, 1])) {
@@ -97,7 +99,7 @@ L_function = function(func, eta0, eta1, sig0, kap) {
 }
 L_NTE1 = L_function(NTE1_function, eta0 = 0.00011, eta1 = 0.007, sig0 = 6.12, kap = 796)
 L_NTE2 = L_function(NTE2_function, eta0 = 0.00047, eta1 = 0.011, sig0 = 6.75, kap = 590)
-L_IDER = L_function(IDER, eta0 = 1.484687e-04, eta1 = 3.513927e-03, sig0 = 4.149660e+00, kap = 4.688287e+02)
+L_IDER = L_function(IDER, eta0 = eta0, eta1 = eta1, sig0 = sig0, kap = kap)
 
 #Since all models both used in our NASA report and 16Cacao's are weighted least square regression, will weight it with our weights to get the WRSS (weighted residual squared sum)
 WRSS_NTE1 = sum((1/modified_df$error^2)*L_NTE1)
@@ -125,7 +127,7 @@ information_critera_df
 
 #Baseline no-synergy/no-antagonism MIXDER (mixed field dose-effect relation(s)) based on any input
 ```{r}
-MIXDER_function = function(r, L, Z.beta, d = seq(0, 0.2, by = 0.001), eta0 = 1.484687e-04, eta1 = 3.513927e-03, sig0 = 4.149660e+00, kap = 4.688287e+02) {
+MIXDER_function = function(r, L, Z.beta, d = seq(0, 0.2, by = 0.001), eta0 = 2.487899e-04, eta1 = 8.994540e-03, sig0 = 5.956631e+00, kap = 6.950537e+02) {
   dE=function(yini,State,Pars){
   eta0 = eta0; eta1 = eta1; sig0 = sig0; kap = kap
   with(as.list(c(State, Pars)), {
@@ -158,7 +160,7 @@ MIXDER_function(r = c(0.5, 0.5), L = c(100, 175), Z.beta = c(690, 1075), d = d1)
 #Graphs for NTE1 and IDER model 12_ion figure
 ```{r, eval = F}
 #When creating any sort of figures we use this IDER now without the background effect then add the background effect at the end.
-IDER = function(d, L, Z.beta, eta0 = 1.484687e-04, eta1 = 3.513927e-03, sig0 = 4.149660e+00, kap = 4.688287e+02) {
+IDER = function(d, L, Z.beta, eta0 = 2.487899e-04, eta1 = 8.994540e-03, sig0 = 5.956631e+00, kap = 6.950537e+02) {
   P = (1-exp(-Z.beta/kap))^2
   sig = sig0*P + 0.041/6.24*L*(1-P)
   eta = eta0*L*exp(-eta1*L)
@@ -308,7 +310,7 @@ dev.off()
 require(mvtnorm)
 sig = vcov(IDER_model)
 set.seed(10)
-monte_carlo_parameters = rmvnorm(n = 500, mean = c(eta0 = 1.484687e-04, eta1 = 3.513927e-03, sig0 = 4.149660e+00, kap = 4.688287e+02), sigma = sig)
+monte_carlo_parameters = rmvnorm(n = 500, mean = c(eta0 = 2.487899e-04, eta1 = 8.994540e-03, sig0 = 5.956631e+00, kap = 6.950537e+02), sigma = sig)
 eta0_MC = monte_carlo_parameters[, 1]
 eta1_MC = monte_carlo_parameters[, 2]
 sig0_MC = monte_carlo_parameters[, 3]
@@ -436,4 +438,15 @@ six_ion_MIXDER$ironsix = IDER(d = d, L = 175, Z.beta = 1075) + 0.00071
 six_ion_MIXDER$ironfour = IDER(d = d, L = 195, Z.beta = 1245) + 0.00071
 six_ion_MIXDER$ironthree = IDER(d = d, L = 240, Z.beta = 1585) + 0.00071
 save(six_ion_MIXDER, file = "six_ion_95%.Rda")
+
+#plotting first figure for MC multivariate gaussian
+fig_42ff_1 = ggplot(data = six_ion_MIXDER, aes(x = d*100, y = CA* 100)) + theme_bw() + theme(axis.line.x = element_line(color="black", size = 0.3), axis.line.y = element_line(color="black", size = 0.3), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.ticks.y = element_line(size = 0.3), axis.ticks.x = element_line(size = 0.3), axis.text=element_text(size=12), axis.title=element_text(size=14), axis.ticks.length = unit(0.3, "cm")) + labs(x = "Dose (cGy)", y = "CA (%)", title = "Mixture of 6 ions") + geom_ribbon(aes(ymin = CI_lower* 100, ymax = CI_upper * 100), fill = "grey90") + geom_line(aes(y = CA * 100), col = "red") + geom_line(aes(y = simpleeffect * 100), col = "black") + geom_line(aes(y = silicon* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = titanium* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironthree* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironfour* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironsix* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = oxygen* 100), col = "blue", linetype = "dotted") 
+
+#Plotting second figure independent gaussian
+fig_42ff_2 = ggplot(data = six_ion_MIXDER, aes(x = d*100, y = CA* 100)) + theme_bw() + theme(axis.line.x = element_line(color="black", size = 0.3), axis.line.y = element_line(color="black", size = 0.3), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.ticks.y = element_line(size = 0.3), axis.ticks.x = element_line(size = 0.3), axis.text=element_text(size=12), axis.title=element_text(size=14), axis.ticks.length = unit(0.3, "cm")) + labs(x = "Dose (cGy)", y = "CA (%)", title = "Mixture of 6 ions") + geom_ribbon(aes(ymin = CI_lower_two* 100, ymax = CI_upper_two * 100), fill = "grey75") + geom_line(aes(y = CA * 100), col = "red") + geom_line(aes(y = simpleeffect * 100), col = "black") + geom_line(aes(y = silicon* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = titanium* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironthree* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironfour* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = ironsix* 100), col = "blue", linetype = "dotted") + geom_line(aes(y = oxygen* 100), col = "blue", linetype = "dotted") 
+
+setEPS()
+postscript("fig_42ff.eps", width = 12, height = 4)
+grid.arrange(fig_42ff_1, fig_42ff_2, ncol = 2)
+dev.off()
 ```
