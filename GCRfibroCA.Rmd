@@ -84,7 +84,6 @@ coef(IDER_model)
 vcov(IDER_model)
 summary(IDER_model, cor = TRUE)
 ```
-1 - (rse / sd)^2
 
 #Information criteria (AIC and BIC) - table 5 
 ```{r}
